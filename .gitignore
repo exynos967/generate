@@ -1,0 +1,10 @@
+__pycache__/
+.ruff_cache/
+.env
+.DS_Store
+
+uploads/*
+!uploads/.gitkeep
+
+IMG_20260528_023640.png
+PixPin_2026-05-28_16-22-11.png

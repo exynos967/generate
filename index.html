@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-store" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <title>工作台 · LLM Video Studio</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-a" aria-hidden="true"></div>
+    <div class="ambient ambient-b" aria-hidden="true"></div>
+    <div class="ambient ambient-c" aria-hidden="true"></div>
+
+    <section id="appView" class="app-view">
+      <header class="topbar glass-panel">
+        <div class="topbar-brand">
+          <span class="brand-mark small" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="img">
+              <path d="M5.4 7.2c2.4-3.7 7.6-4.4 10.9-1.5 3.4 2.9 3.4 8.1 0 11-3.3 2.9-8.5 2.2-10.9-1.5 2.6 1.7 6.1 1.3 8.2-.9 2.2-2.3 2.2-5.9 0-8.2-2.1-2.2-5.6-2.6-8.2-.9Z" />
+              <path d="M7.8 12.1c0-2.2 1.8-4 4-4 1.1 0 2.1.4 2.8 1.1a5.3 5.3 0 0 0-7.4-4.8A7.5 7.5 0 1 1 7.2 20a5.3 5.3 0 0 0 7.4-4.8 4 4 0 0 1-6.8-3.1Z" opacity=".72" />
+            </svg>
+          </span>
+          <div>
+            <strong>LLM Video Studio</strong>
+            <span id="maskedKey">sk-****</span>
+          </div>
+        </div>
+
+        <nav class="mode-tabs" aria-label="页面导航">
+          <button class="tab-button active" type="button" data-scroll-target="workspace">生成</button>
+          <button class="tab-button" type="button" data-scroll-target="historySection">任务</button>
+          <button class="tab-button" type="button" data-scroll-target="apiSection">API</button>
+        </nav>
+
+        <div class="topbar-actions">
+          <label class="sr-only" for="appBaseUrlInput">API Base URL</label>
+          <input id="appBaseUrlInput" class="inline-input" type="url" />
+          <button id="saveSettingsButton" class="ghost-button" type="button">保存</button>
+          <button id="logoutButton" class="ghost-button strong" type="button">退出</button>
+        </div>
+      </header>
+
+      <main id="workspace" class="workspace">
+        <aside class="glass-panel panel config-panel reveal delay-1">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Settings</p>
+              <h2>模型与参数</h2>
+            </div>
+            <span id="endpointBadge" class="status-chip">/v1/videos</span>
+          </div>
+
+          <form id="videoForm" class="video-form">
+            <div class="field">
+              <label for="modelSelect">模型</label>
+              <select id="modelSelect" name="model"></select>
+            </div>
+
+            <div class="field">
+              <span class="label-text">任务类型</span>
+              <div class="segmented" role="radiogroup" aria-label="任务类型">
+                <label>
+                  <input type="radio" name="type" value="1" checked />
+                  <span>文生视频</span>
+                </label>
+                <label>
+                  <input type="radio" name="type" value="2" />
+                  <span>首尾帧</span>
+                </label>
+                <label>
+                  <input type="radio" name="type" value="3" />
+                  <span>参考图</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="aspectRatioSelect">比例</label>
+                <select id="aspectRatioSelect" name="aspect_ratio">
+                  <option value="16:9">16:9</option>
+                  <option value="9:16">9:16</option>
+                  <option value="1:1">1:1</option>
+                  <option value="4:3">4:3</option>
+                  <option value="3:4">3:4</option>
+                  <option value="21:9">21:9</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="secondsSelect">时长</label>
+                <select id="secondsSelect" name="seconds">
+                  <option value="4">4 秒</option>
+                  <option value="6" selected>6 秒</option>
+                  <option value="8">8 秒</option>
+                  <option value="12">12 秒</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="field-grid">
+              <div class="field">
+                <label for="sizeInput">尺寸 size</label>
+                <input id="sizeInput" name="size" type="text" placeholder="1280x720" />
+              </div>
+              <div class="field">
+                <label for="pollIntervalInput">轮询间隔</label>
+                <select id="pollIntervalInput">
+                  <option value="3000">3 秒</option>
+                  <option value="5000" selected>5 秒</option>
+                  <option value="8000">8 秒</option>
+                </select>
+              </div>
+            </div>
+
+            <label class="switch-row" for="audioToggle">
+              <span>
+                <strong>生成音频</strong>
+                <small>Sora 使用 generateAudio，Veo 使用 generate_audio</small>
+              </span>
+              <input id="audioToggle" name="audio" type="checkbox" />
+            </label>
+
+            <div id="imageFields" class="field image-fields" hidden>
+              <div class="field-head">
+                <label id="imageFieldsTitle">参考图片</label>
+                <span id="uploadEndpointHint" class="upload-endpoint"></span>
+              </div>
+              <div id="imageUploadGrid" class="image-upload-grid">
+                <div class="upload-box" data-upload-slot="reference" hidden>
+                  <input id="referenceImageInput" class="sr-only" type="file" accept="image/*" data-upload-input="reference" />
+                  <label class="upload-drop" for="referenceImageInput">
+                    <span class="upload-preview" aria-hidden="true">
+                      <img alt="" data-upload-preview="reference" hidden />
+                    </span>
+                    <span class="upload-copy">
+                      <strong data-upload-title="reference">参考图</strong>
+                      <small data-upload-meta="reference">点击上传图片</small>
+                    </span>
+                  </label>
+                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="reference" aria-label="删除参考图">删除</button>
+                </div>
+
+                <div class="upload-box" data-upload-slot="first" hidden>
+                  <input id="firstFrameInput" class="sr-only" type="file" accept="image/*" data-upload-input="first" />
+                  <label class="upload-drop" for="firstFrameInput">
+                    <span class="upload-preview" aria-hidden="true">
+                      <img alt="" data-upload-preview="first" hidden />
+                    </span>
+                    <span class="upload-copy">
+                      <strong data-upload-title="first">首帧</strong>
+                      <small data-upload-meta="first">点击上传首帧图片</small>
+                    </span>
+                  </label>
+                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="first" aria-label="删除首帧图片">删除</button>
+                </div>
+
+                <div class="upload-box" data-upload-slot="last" hidden>
+                  <input id="lastFrameInput" class="sr-only" type="file" accept="image/*" data-upload-input="last" />
+                  <label class="upload-drop" for="lastFrameInput">
+                    <span class="upload-preview" aria-hidden="true">
+                      <img alt="" data-upload-preview="last" hidden />
+                    </span>
+                    <span class="upload-copy">
+                      <strong data-upload-title="last">尾帧</strong>
+                      <small data-upload-meta="last">点击上传尾帧图片</small>
+                    </span>
+                  </label>
+                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="last" aria-label="删除尾帧图片">删除</button>
+                </div>
+              </div>
+              <p class="field-hint">图片会先上传到当前服务的上传 API，视频任务中只提交服务器返回的图片 URL。</p>
+            </div>
+
+            <div class="field">
+              <label for="negativePromptInput">负面提示词</label>
+              <input id="negativePromptInput" name="negative_prompt" type="text" placeholder="blur, distortion, low quality" />
+            </div>
+          </form>
+        </aside>
+
+        <section class="glass-panel panel prompt-panel reveal delay-2">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Prompt</p>
+              <h2>创意描述</h2>
+            </div>
+          </div>
+
+          <label class="sr-only" for="promptInput">视频描述</label>
+          <textarea
+            id="promptInput"
+            name="prompt"
+            placeholder="描述镜头、主体、运动、光线与氛围..."
+            spellcheck="false"
+          >A tracking shot through a futuristic train station, glass reflections, soft neon light, cinematic depth of field</textarea>
+
+          <div class="submit-row">
+            <button id="generateButton" class="primary-button wide" type="button">
+              <span>开始生成</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="m11 4 1.7 4.8L17.5 10l-4.8 1.7L11 16.5l-1.7-4.8L4.5 10l4.8-1.2L11 4Zm6.2 8.8.9 2.4 2.4.8-2.4.9-.9 2.4-.8-2.4-2.4-.9 2.4-.8.8-2.4Z" />
+              </svg>
+            </button>
+            <button id="copyPayloadButton" class="ghost-button" type="button">复制 JSON</button>
+          </div>
+
+          <section id="apiSection" class="api-preview">
+            <div class="section-title">
+              <h3>请求体预览</h3>
+              <span id="payloadMode">Veo 字段</span>
+            </div>
+            <pre><code id="payloadPreview">{}</code></pre>
+          </section>
+        </section>
+
+        <aside class="glass-panel panel result-panel reveal delay-3">
+          <div class="panel-head">
+            <div>
+              <p class="eyebrow">Result</p>
+              <h2>生成结果</h2>
+            </div>
+            <button id="clearResultButton" class="link-button" type="button">清空</button>
+          </div>
+
+          <div id="resultStage" class="video-stage">
+            <div id="resultEmpty" class="result-empty">
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <path d="M21 34c0-8.3 6.7-15 15-15h48c8.3 0 15 6.7 15 15v52c0 8.3-6.7 15-15 15H36c-8.3 0-15-6.7-15-15V34Z" />
+                <path d="m45 43 29 17-29 17V43Z" />
+              </svg>
+              <p>创建任务后，视频 URL 与轮询状态会显示在这里。</p>
+            </div>
+            <video id="resultVideo" controls playsinline hidden></video>
+            <div id="resultWaiting" class="result-waiting" hidden>
+              <svg viewBox="0 0 120 120" aria-hidden="true">
+                <path d="M21 34c0-8.3 6.7-15 15-15h48c8.3 0 15 6.7 15 15v52c0 8.3-6.7 15-15 15H36c-8.3 0-15-6.7-15-15V34Z" />
+                <path d="m45 43 29 17-29 17V43Z" />
+              </svg>
+              <p>任务已创建，正在等待视频 URL。</p>
+            </div>
+          </div>
+
+          <div id="resultContent" class="result-content" hidden>
+            <div class="task-status">
+              <span id="taskStatusChip" class="status-chip">queued</span>
+              <span id="taskIdText"></span>
+            </div>
+            <div class="progress-track" aria-label="任务进度">
+              <span id="progressBar"></span>
+            </div>
+            <div id="resultLinks" class="result-links"></div>
+            <pre class="response-box"><code id="responseJson">{}</code></pre>
+            <div class="result-actions">
+              <button id="pollButton" class="ghost-button" type="button">刷新任务</button>
+              <button id="copyResponseButton" class="ghost-button" type="button">复制响应</button>
+            </div>
+          </div>
+
+          <p id="requestError" class="form-error" role="alert"></p>
+        </aside>
+      </main>
+
+      <section id="historySection" class="glass-panel history-panel reveal delay-2">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Queue</p>
+            <h2>最近任务</h2>
+          </div>
+          <div class="history-actions">
+            <button id="refreshAllButton" class="link-button" type="button">刷新进行中</button>
+            <button id="clearHistoryButton" class="link-button danger" type="button">清空记录</button>
+          </div>
+        </div>
+        <div id="historyList" class="history-list"></div>
+      </section>
+    </section>
+
+    <script src="./video-studio.js?v=20260528-1710"></script>
+  </body>
+</html>

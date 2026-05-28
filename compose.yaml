@@ -1,0 +1,13 @@
+services:
+  generate:
+    build: .
+    image: generate:local
+    container_name: generate-video-studio
+    restart: unless-stopped
+    ports:
+      - "4173:4173"
+    environment:
+      # 改成你的公网域名或公网 IP，例如 https://video.example.com
+      PUBLIC_BASE_URL: ""
+    volumes:
+      - ./uploads:/app/uploads
