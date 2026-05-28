@@ -125,7 +125,6 @@
             <div id="imageFields" class="field image-fields" hidden>
               <div class="field-head">
                 <label id="imageFieldsTitle">参考图片</label>
-                <span id="uploadEndpointHint" class="upload-endpoint"></span>
               </div>
               <div id="imageUploadGrid" class="image-upload-grid">
                 <div class="upload-box" data-upload-slot="reference" hidden>
@@ -139,7 +138,7 @@
                       <small data-upload-meta="reference">点击上传图片</small>
                     </span>
                   </label>
-                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="reference" aria-label="删除参考图">删除</button>
+                  <button class="delete-upload" type="button" data-clear-slot="reference" aria-label="删除参考图">删除</button>
                 </div>
 
                 <div class="upload-box" data-upload-slot="first" hidden>
@@ -153,7 +152,7 @@
                       <small data-upload-meta="first">点击上传首帧图片</small>
                     </span>
                   </label>
-                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="first" aria-label="删除首帧图片">删除</button>
+                  <button class="delete-upload" type="button" data-clear-slot="first" aria-label="删除首帧图片">删除</button>
                 </div>
 
                 <div class="upload-box" data-upload-slot="last" hidden>
@@ -167,10 +166,10 @@
                       <small data-upload-meta="last">点击上传尾帧图片</small>
                     </span>
                   </label>
-                  <button class="ghost-button compact delete-upload" type="button" data-clear-slot="last" aria-label="删除尾帧图片">删除</button>
+                  <button class="delete-upload" type="button" data-clear-slot="last" aria-label="删除尾帧图片">删除</button>
                 </div>
               </div>
-              <p class="field-hint">图片会先上传到当前服务的上传 API，视频任务中只提交服务器返回的图片 URL。</p>
+              <p class="field-hint">图片会先上传到当前网站服务器，视频任务中只提交服务器返回的公网图片 URL。</p>
             </div>
 
             <div class="field">
@@ -277,6 +276,6 @@
       </section>
     </section>
 
-    <script src="./video-studio.js?v=20260528-1710"></script>
+    <script src="./video-studio.js?v=20260528-1738"></script>
   </body>
 </html>

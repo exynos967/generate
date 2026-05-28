@@ -621,44 +621,36 @@ h3 {
   gap: 8px;
 }
 
-.image-list {
-  display: grid;
-  gap: 8px;
-}
-
-.upload-endpoint {
-  max-width: 190px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .image-upload-grid {
   display: grid;
-  gap: 10px;
+  gap: 12px;
+}
+
+.image-upload-grid[data-mode="frames"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .upload-box {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: stretch;
-  gap: 8px;
+  position: relative;
+  min-width: 0;
 }
 
 .upload-drop {
+  position: relative;
   display: grid;
-  grid-template-columns: 78px 1fr;
-  min-height: 96px;
-  align-items: center;
-  gap: 14px;
+  min-height: 164px;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
   margin: 0;
-  padding: 10px;
-  border: 1px dashed rgba(84, 116, 247, 0.36);
+  padding: 18px;
+  overflow: hidden;
+  border: 1.5px dashed rgba(71, 85, 105, 0.45);
   border-radius: 18px;
-  background: rgba(255, 255, 255, 0.52);
+  color: var(--muted);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.52), rgba(241, 245, 249, 0.42)),
+    rgba(255, 255, 255, 0.44);
   cursor: pointer;
   transition:
     border-color 180ms ease,
@@ -667,47 +659,76 @@ h3 {
 }
 
 .upload-drop:hover {
-  border-color: rgba(84, 116, 247, 0.62);
-  background: rgba(255, 255, 255, 0.82);
+  border-color: rgba(84, 116, 247, 0.64);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.74), rgba(239, 246, 255, 0.64)),
+    rgba(255, 255, 255, 0.72);
   box-shadow: var(--shadow-soft);
 }
 
 .upload-preview {
   display: grid;
-  width: 76px;
-  height: 76px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   overflow: hidden;
-  border-radius: 16px;
-  color: rgba(84, 116, 247, 0.48);
-  background:
-    linear-gradient(135deg, rgba(84, 116, 247, 0.16), rgba(52, 198, 180, 0.12)),
-    rgba(255, 255, 255, 0.56);
+  border-radius: 12px;
+  color: rgba(100, 116, 139, 0.9);
+  transition:
+    inset 180ms ease,
+    width 180ms ease,
+    height 180ms ease,
+    border-radius 180ms ease;
 }
 
 .upload-preview::before {
   content: "";
-  width: 28px;
-  height: 28px;
-  border: 2px solid currentColor;
-  border-radius: 8px;
-  box-shadow: inset 10px -8px 0 rgba(84, 116, 247, 0.12);
+  width: 34px;
+  height: 34px;
+  background: currentColor;
+  -webkit-mask:
+    linear-gradient(#000 0 0) 15px 6px / 4px 20px no-repeat,
+    linear-gradient(45deg, transparent 42%, #000 43% 57%, transparent 58%) 8px 4px / 18px 18px no-repeat,
+    linear-gradient(-45deg, transparent 42%, #000 43% 57%, transparent 58%) 8px 4px / 18px 18px no-repeat,
+    linear-gradient(#000 0 0) 6px 27px / 22px 3px no-repeat,
+    linear-gradient(#000 0 0) 4px 20px / 3px 10px no-repeat,
+    linear-gradient(#000 0 0) 27px 20px / 3px 10px no-repeat;
+  mask:
+    linear-gradient(#000 0 0) 15px 6px / 4px 20px no-repeat,
+    linear-gradient(45deg, transparent 42%, #000 43% 57%, transparent 58%) 8px 4px / 18px 18px no-repeat,
+    linear-gradient(-45deg, transparent 42%, #000 43% 57%, transparent 58%) 8px 4px / 18px 18px no-repeat,
+    linear-gradient(#000 0 0) 6px 27px / 22px 3px no-repeat,
+    linear-gradient(#000 0 0) 4px 20px / 3px 10px no-repeat,
+    linear-gradient(#000 0 0) 27px 20px / 3px 10px no-repeat;
 }
 
-.upload-preview.has-image::before {
+.upload-drop.has-image .upload-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+
+.upload-drop.has-image .upload-preview::before {
   content: none;
 }
 
 .upload-preview img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: rgba(15, 23, 42, 0.86);
 }
 
 .upload-copy {
+  position: relative;
+  z-index: 2;
   display: grid;
-  gap: 5px;
+  gap: 6px;
   min-width: 0;
+  justify-items: center;
+  text-align: center;
 }
 
 .upload-copy strong,
@@ -723,10 +744,49 @@ h3 {
   font-weight: 600;
 }
 
+.upload-drop.has-image .upload-copy {
+  align-self: end;
+  width: min(100%, 92%);
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  border-radius: 12px;
+  color: white;
+  background: rgba(15, 23, 42, 0.64);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.upload-drop.has-image .upload-copy small {
+  color: rgba(226, 232, 240, 0.88);
+}
+
 .delete-upload {
-  width: auto;
-  min-width: 58px;
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  min-height: 32px;
   padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  color: white;
+  background: rgba(15, 23, 42, 0.64);
+  opacity: 0;
+  pointer-events: none;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition:
+    opacity 180ms ease,
+    background 180ms ease;
+}
+
+.upload-box.has-file .delete-upload {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.delete-upload:hover {
+  background: rgba(220, 38, 38, 0.82);
 }
 
 .prompt-panel {

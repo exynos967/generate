@@ -125,7 +125,6 @@
       imageFields: document.querySelector("#imageFields"),
       imageFieldsTitle: document.querySelector("#imageFieldsTitle"),
       imageUploadGrid: document.querySelector("#imageUploadGrid"),
-      uploadEndpointHint: document.querySelector("#uploadEndpointHint"),
       negativePromptInput: document.querySelector("#negativePromptInput"),
       promptInput: document.querySelector("#promptInput"),
       generateButton: document.querySelector("#generateButton"),
@@ -286,6 +285,7 @@
     const activeSlots = getActiveUploadSlots(type);
     els.imageFields.hidden = type === "1";
     els.imageFieldsTitle.textContent = type === "2" ? "首尾帧图片" : "参考图片";
+    els.imageUploadGrid.dataset.mode = type === "2" ? "frames" : "reference";
 
     document.querySelectorAll("[data-upload-slot]").forEach((box) => {
       box.hidden = !activeSlots.includes(box.dataset.uploadSlot);
@@ -369,6 +369,8 @@
     const upload = state.uploads[slot];
     const preview = document.querySelector(`[data-upload-preview="${slot}"]`);
     const previewWrap = preview?.closest(".upload-preview");
+    const drop = preview?.closest(".upload-drop");
+    const box = preview?.closest(".upload-box");
     const meta = document.querySelector(`[data-upload-meta="${slot}"]`);
     const title = document.querySelector(`[data-upload-title="${slot}"]`);
     const clearButton = document.querySelector(`[data-clear-slot="${slot}"]`);
@@ -390,6 +392,8 @@
       preview.hidden = true;
       preview.removeAttribute("src");
       previewWrap?.classList.remove("has-image");
+      drop?.classList.remove("has-image");
+      box?.classList.remove("has-file");
       meta.textContent = labels[slot][1];
       return;
     }
@@ -397,6 +401,8 @@
     preview.src = upload.previewUrl || upload.remoteUrl;
     preview.hidden = false;
     previewWrap?.classList.add("has-image");
+    drop?.classList.add("has-image");
+    box?.classList.add("has-file");
     meta.textContent = upload.remoteUrl ? "已上传到服务器" : `${upload.fileName} · ${formatFileSize(upload.fileSize)}`;
   }
 
@@ -887,10 +893,6 @@
     if (els.endpointBadge) {
       els.endpointBadge.textContent = getVideosUrl(baseUrl);
       els.endpointBadge.title = getVideosUrl(baseUrl);
-    }
-    if (els.uploadEndpointHint) {
-      els.uploadEndpointHint.textContent = getUploadUrl();
-      els.uploadEndpointHint.title = getUploadUrl();
     }
   }
 
