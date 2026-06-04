@@ -456,6 +456,41 @@ h3 {
   line-height: 1.5;
 }
 
+.abuseipdb-support {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.abuseipdb-support a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition:
+    opacity 180ms ease,
+    transform 180ms ease;
+}
+
+.abuseipdb-support a:hover {
+  opacity: 0.86;
+  transform: translateY(-1px);
+}
+
+.abuseipdb-support img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
 .app-view {
   min-height: 100svh;
   padding: 14px 14px 34px;
