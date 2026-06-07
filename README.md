@@ -49,13 +49,13 @@ https://video.example.com/uploads/<file>
 ## Docker 运行
 
 ```bash
-docker build -t generate-video-studio .
+docker build -t generate-video-studio:latest .
 docker run -d \
   --name generate-video-studio \
   -p 4173:4173 \
   -e PUBLIC_BASE_URL=https://video.example.com \
   -v "$PWD/uploads:/app/uploads" \
-  generate-video-studio
+  generate-video-studio:latest
 ```
 
 也可以用 Compose：

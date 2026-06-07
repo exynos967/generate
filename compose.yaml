@@ -1,7 +1,7 @@
 services:
   generate:
     build: .
-    image: generate:local
+    image: generate:latest
     container_name: generate-video-studio
     restart: unless-stopped
     ports:
