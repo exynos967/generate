@@ -25,15 +25,40 @@
   const TERMINAL_STATUS = new Set([
     "completed",
     "complete",
+    "done",
+    "finished",
+    "finish",
+    "ready",
+    "generated",
     "succeeded",
     "success",
     "failed",
     "error",
     "cancelled",
     "canceled",
+    "timeout",
+    "expired",
+    "完成",
+    "已完成",
+    "失败",
+    "已取消",
   ]);
 
-  const SUCCESS_STATUS = new Set(["completed", "complete", "succeeded", "success"]);
+  const SUCCESS_STATUS = new Set([
+    "completed",
+    "complete",
+    "done",
+    "finished",
+    "finish",
+    "ready",
+    "generated",
+    "succeeded",
+    "success",
+    "完成",
+    "已完成",
+  ]);
+
+  const FAILURE_STATUS = new Set(["failed", "error", "cancelled", "canceled", "timeout", "expired", "失败", "已取消"]);
 
   const els = {};
   const state = {
@@ -693,10 +718,10 @@
 
   function taskFromResponse(response, payload) {
     const taskId = extractTaskId(response);
-    const status = normalizeStatus(extractByKeys(response, ["status", "state", "task_status"]) || "queued");
-    const progress = extractProgress(response, status);
     const videoUrls = extractVideoUrls(response);
     const urls = unique([...videoUrls, ...extractUrls(response)]);
+    const status = resolveTaskStatus(response, "queued", videoUrls.length > 0);
+    const progress = extractProgress(response, status, 0, { hasVideo: videoUrls.length > 0 });
 
     return {
       uid: createUid(),
@@ -716,10 +741,11 @@
 
   function mergeTaskResponse(existing, response) {
     const taskId = extractTaskId(response) || existing?.taskId || "";
-    const status = normalizeStatus(extractByKeys(response, ["status", "state", "task_status"]) || existing?.status || "processing");
-    const progress = extractProgress(response, status, existing?.progress || 0);
     const videoUrls = extractVideoUrls(response);
     const urls = unique([...(existing?.urls || []), ...videoUrls, ...extractUrls(response)]);
+    const hasVideo = videoUrls.length > 0 || Boolean(existing?.videoUrl);
+    const status = resolveTaskStatus(response, existing?.status || "processing", hasVideo);
+    const progress = extractProgress(response, status, existing?.progress || 0, { hasVideo });
 
     return {
       uid: existing?.uid || createUid(),
@@ -1044,11 +1070,32 @@
   }
 
   function isTerminal(status) {
-    return TERMINAL_STATUS.has(normalizeStatus(status));
+    const normalized = normalizeStatus(status);
+    return TERMINAL_STATUS.has(normalized) || isSuccessStatus(normalized) || isFailureStatus(normalized);
+  }
+
+  function isSuccessStatus(status) {
+    const normalized = normalizeStatus(status);
+    return SUCCESS_STATUS.has(normalized) || /complete|success|succeed|done|finish|ready|generated/i.test(normalized);
+  }
+
+  function isFailureStatus(status) {
+    const normalized = normalizeStatus(status);
+    return FAILURE_STATUS.has(normalized) || /fail|error|cancel|timeout|expired|reject/i.test(normalized);
   }
 
   function normalizeStatus(status) {
     return String(status || "queued").trim().toLowerCase();
+  }
+
+  function resolveTaskStatus(value, fallback = "processing", hasVideo = false) {
+    const status = normalizeStatus(extractByKeys(value, ["status", "state", "task_status", "task_state"]) || fallback);
+
+    if (hasVideo && !isFailureStatus(status)) {
+      return isSuccessStatus(status) ? status : "completed";
+    }
+
+    return status;
   }
 
   function extractTaskId(value) {
@@ -1059,23 +1106,58 @@
     );
   }
 
-  function extractProgress(value, status, fallback = 0) {
-    const raw = extractByKeys(value, ["progress", "percent", "percentage"]) ?? fallback;
-    let progress = Number(raw);
+  function extractProgress(value, status, fallback = 0, { hasVideo = false } = {}) {
+    const raw = extractProgressValue(value);
+    let progress = raw ?? parseProgressNumber(fallback) ?? 0;
 
     if (!Number.isFinite(progress)) {
-      progress = fallback;
+      progress = parseProgressNumber(fallback) ?? 0;
     }
 
     if (progress > 0 && progress <= 1) {
       progress *= 100;
     }
 
-    if (SUCCESS_STATUS.has(normalizeStatus(status))) {
+    if (hasVideo || isSuccessStatus(status)) {
       progress = 100;
     }
 
     return Math.max(0, Math.min(100, Math.round(progress)));
+  }
+
+  function extractProgressValue(value) {
+    let found;
+
+    scan(value, (key, item) => {
+      if (found !== undefined || !/(progress|percent|percentage|rate)/i.test(key)) {
+        return;
+      }
+
+      const parsed = parseProgressNumber(item);
+      if (parsed !== null) {
+        found = parsed;
+      }
+    });
+
+    return found;
+  }
+
+  function parseProgressNumber(value) {
+    if (typeof value === "number" && Number.isFinite(value)) {
+      return value;
+    }
+
+    if (typeof value !== "string") {
+      return null;
+    }
+
+    const match = value.match(/-?\d+(?:\.\d+)?/);
+    if (!match) {
+      return null;
+    }
+
+    const parsed = Number(match[0]);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   function extractVideoUrls(value) {
