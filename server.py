@@ -19,11 +19,14 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlsplit
+from urllib.error import HTTPError, URLError
+from urllib.parse import parse_qs, unquote, urlsplit
+from urllib.request import Request, urlopen
 
 
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
 UPLOAD_ROUTE = "/api/upload/file"
+VIDEO_PROXY_ROUTE = "/api/proxy/video"
 UPLOAD_URL_PREFIX = "/uploads"
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg",
@@ -52,17 +55,37 @@ class VideoStudioHandler(SimpleHTTPRequestHandler):
         if request_path == "/healthz":
             self.send_json(HTTPStatus.OK, {"ok": True})
             return
+        if request_path == VIDEO_PROXY_ROUTE:
+            try:
+                self.handle_video_proxy(head_only=False)
+            except UploadError as error:
+                self.send_json(error.status, {"error": error.message})
+            except Exception as error:  # noqa: BLE001
+                self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
+            return
         if request_path == "/":
             self.path = "/login.html"
         super().do_GET()
 
+    def do_HEAD(self) -> None:
+        request_path = urlsplit(self.path).path
+        if request_path == VIDEO_PROXY_ROUTE:
+            try:
+                self.handle_video_proxy(head_only=True)
+            except UploadError as error:
+                self.send_json(error.status, {"error": error.message})
+            except Exception as error:  # noqa: BLE001
+                self.send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": str(error)})
+            return
+        super().do_HEAD()
+
     def do_OPTIONS(self) -> None:
-        if urlsplit(self.path).path != UPLOAD_ROUTE:
+        if urlsplit(self.path).path not in {UPLOAD_ROUTE, VIDEO_PROXY_ROUTE}:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
 
         self.send_response(HTTPStatus.NO_CONTENT)
-        self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
         self.end_headers()
 
@@ -147,6 +170,62 @@ class VideoStudioHandler(SimpleHTTPRequestHandler):
             "size": len(image_bytes),
             "content_type": media_type,
         }
+
+    def handle_video_proxy(self, head_only: bool = False) -> None:
+        query = parse_qs(urlsplit(self.path).query)
+        target_url = (query.get("url") or [""])[0].strip()
+        if not target_url:
+            raise UploadError(HTTPStatus.BAD_REQUEST, "缺少 url 参数。")
+
+        parsed = urlsplit(target_url)
+        if parsed.scheme not in {"http", "https"}:
+            raise UploadError(HTTPStatus.BAD_REQUEST, "只允许代理 http/https 视频地址。")
+
+        request_headers = {
+            "User-Agent": self.headers.get("User-Agent", "LLMVideoStudio/1.0"),
+            "Accept": self.headers.get("Accept", "*/*"),
+            "Referer": f"{self.get_public_base_url()}/",
+        }
+        if self.headers.get("Authorization"):
+            request_headers["Authorization"] = self.headers["Authorization"]
+        if self.headers.get("Range"):
+            request_headers["Range"] = self.headers["Range"]
+
+        upstream_request = Request(target_url, headers=request_headers, method="HEAD" if head_only else "GET")
+
+        try:
+            with urlopen(upstream_request, timeout=60) as upstream:
+                self.send_response(upstream.status)
+                for header_name in (
+                    "Content-Type",
+                    "Content-Length",
+                    "Content-Range",
+                    "Accept-Ranges",
+                    "Content-Disposition",
+                    "Cache-Control",
+                    "ETag",
+                    "Last-Modified",
+                ):
+                    header_value = upstream.headers.get(header_name)
+                    if header_value:
+                        self.send_header(header_name, header_value)
+                self.end_headers()
+                if head_only:
+                    return
+                while True:
+                    chunk = upstream.read(1024 * 64)
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+        except HTTPError as error:
+            self.send_response(error.code)
+            self.send_header("Content-Type", error.headers.get("Content-Type", "application/json; charset=utf-8"))
+            body = error.read()
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+        except URLError as error:
+            raise UploadError(HTTPStatus.BAD_GATEWAY, f"代理拉取视频失败：{error.reason}") from error
 
     def get_content_length(self) -> int:
         try:

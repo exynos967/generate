@@ -42,6 +42,8 @@
     tasks: [],
     selectedUid: "",
     activePolls: new Map(),
+    videoObjectUrl: "",
+    videoSourceUrl: "",
     uploads: {
       reference: null,
       first: null,
@@ -141,6 +143,7 @@
       resultWaiting: document.querySelector("#resultWaiting"),
       resultLinks: document.querySelector("#resultLinks"),
       responseJson: document.querySelector("#responseJson"),
+      downloadVideoButton: document.querySelector("#downloadVideoButton"),
       pollButton: document.querySelector("#pollButton"),
       copyResponseButton: document.querySelector("#copyResponseButton"),
       clearResultButton: document.querySelector("#clearResultButton"),
@@ -181,6 +184,7 @@
     els.appBaseUrlInput.addEventListener("input", syncEndpointBadge);
     els.generateButton.addEventListener("click", createVideoTask);
     els.copyPayloadButton.addEventListener("click", () => copyText(els.payloadPreview.textContent, "已复制请求 JSON"));
+    els.downloadVideoButton.addEventListener("click", handleDownloadVideo);
     els.pollButton.addEventListener("click", () => {
       const task = getSelectedTask();
       if (task?.taskId) {
@@ -691,7 +695,8 @@
     const taskId = extractTaskId(response);
     const status = normalizeStatus(extractByKeys(response, ["status", "state", "task_status"]) || "queued");
     const progress = extractProgress(response, status);
-    const urls = extractUrls(response);
+    const videoUrls = extractVideoUrls(response);
+    const urls = unique([...videoUrls, ...extractUrls(response)]);
 
     return {
       uid: createUid(),
@@ -700,7 +705,7 @@
       prompt: payload.prompt,
       status,
       progress,
-      videoUrl: urls[0] || "",
+      videoUrl: videoUrls[0] || "",
       urls,
       payload,
       response,
@@ -713,7 +718,8 @@
     const taskId = extractTaskId(response) || existing?.taskId || "";
     const status = normalizeStatus(extractByKeys(response, ["status", "state", "task_status"]) || existing?.status || "processing");
     const progress = extractProgress(response, status, existing?.progress || 0);
-    const urls = unique([...(existing?.urls || []), ...extractUrls(response)]);
+    const videoUrls = extractVideoUrls(response);
+    const urls = unique([...(existing?.urls || []), ...videoUrls, ...extractUrls(response)]);
 
     return {
       uid: existing?.uid || createUid(),
@@ -722,7 +728,7 @@
       prompt: existing?.prompt || "",
       status,
       progress,
-      videoUrl: urls[0] || existing?.videoUrl || "",
+      videoUrl: videoUrls[0] || existing?.videoUrl || "",
       urls,
       payload: existing?.payload || null,
       response,
@@ -777,16 +783,24 @@
     els.progressBar.style.width = `${task.progress || 0}%`;
     els.responseJson.textContent = JSON.stringify(task.response || {}, null, 2);
     els.pollButton.disabled = !task.taskId || isTerminal(status);
+    els.downloadVideoButton.disabled = !task.videoUrl;
 
     if (task.videoUrl) {
-      els.resultVideo.hidden = false;
-      els.resultWaiting.hidden = true;
-      if (els.resultVideo.src !== task.videoUrl) {
-        els.resultVideo.src = task.videoUrl;
+      if (state.videoSourceUrl === task.videoUrl && state.videoObjectUrl) {
+        els.resultVideo.hidden = false;
+        els.resultWaiting.hidden = true;
+        if (els.resultVideo.src !== state.videoObjectUrl) {
+          els.resultVideo.src = state.videoObjectUrl;
+        }
+      } else {
+        els.resultVideo.hidden = true;
+        setResultWaiting("视频已生成，正在加载播放器...");
+        void ensurePlayableVideo(task);
       }
     } else {
+      revokeVideoObjectUrl();
       els.resultVideo.hidden = true;
-      els.resultWaiting.hidden = false;
+      setResultWaiting("任务已创建，正在等待视频 URL。");
       els.resultVideo.removeAttribute("src");
     }
 
@@ -800,9 +814,10 @@
       const row = document.createElement("div");
       const link = document.createElement("a");
       const copyButton = document.createElement("button");
+      const proxyUrl = getVideoProxyUrl(url);
 
       row.className = "result-link";
-      link.href = url;
+      link.href = proxyUrl;
       link.target = "_blank";
       link.rel = "noreferrer";
       link.textContent = `${index === 0 ? "视频地址" : `备用地址 ${index + 1}`} · ${url}`;
@@ -841,6 +856,7 @@
 
   function clearResult() {
     state.selectedUid = "";
+    revokeVideoObjectUrl();
     els.resultEmpty.hidden = false;
     els.resultContent.hidden = true;
     els.resultVideo.pause();
@@ -850,6 +866,7 @@
     els.resultLinks.innerHTML = "";
     els.responseJson.textContent = "{}";
     els.progressBar.style.width = "0%";
+    els.downloadVideoButton.disabled = true;
     clearRequestError();
   }
 
@@ -881,6 +898,26 @@
     }
     event.preventDefault();
     copyText(copyButton.dataset.copyUrl, "已复制视频 URL");
+  }
+
+  async function handleDownloadVideo() {
+    const task = getSelectedTask();
+    if (!task?.videoUrl) {
+      flashMessage(els.requestError, "当前任务还没有可下载的视频 URL。");
+      return;
+    }
+
+    const objectUrl = await ensurePlayableVideo(task, { surfaceError: true });
+    if (!objectUrl) {
+      return;
+    }
+
+    const anchor = document.createElement("a");
+    anchor.href = objectUrl;
+    anchor.download = buildDownloadFilename(task);
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
   }
 
   function setGenerating(isGenerating, label = "提交中...") {
@@ -926,6 +963,12 @@
     } catch {
       return "/api/upload/file";
     }
+  }
+
+  function getVideoProxyUrl(rawUrl) {
+    const currentOrigin = window.location.origin;
+    const base = currentOrigin && currentOrigin !== "null" ? currentOrigin : "";
+    return `${base}/api/proxy/video?url=${encodeURIComponent(rawUrl)}`;
   }
 
   function currentBaseUrl() {
@@ -1035,6 +1078,37 @@
     return Math.max(0, Math.min(100, Math.round(progress)));
   }
 
+  function extractVideoUrls(value) {
+    const urls = [];
+
+    pushHttpUrl(urls, value?.video_url);
+    pushHttpUrl(urls, value?.url);
+
+    if (value?.data && !Array.isArray(value.data)) {
+      pushHttpUrl(urls, value.data.video_url);
+      pushHttpUrl(urls, value.data.url);
+    }
+
+    if (Array.isArray(value?.data)) {
+      value.data.forEach((item) => {
+        pushHttpUrl(urls, item?.video_url);
+        pushHttpUrl(urls, item?.url);
+      });
+    }
+
+    if (value?.result && typeof value.result === "object") {
+      pushHttpUrl(urls, value.result.video_url);
+      pushHttpUrl(urls, value.result.url);
+    }
+
+    if (value?.output && typeof value.output === "object") {
+      pushHttpUrl(urls, value.output.video_url);
+      pushHttpUrl(urls, value.output.url);
+    }
+
+    return unique(urls);
+  }
+
   function extractUrls(value) {
     if (typeof value === "string" && /^https?:\/\//i.test(value)) {
       return [value];
@@ -1047,6 +1121,12 @@
       }
     });
     return unique(urls);
+  }
+
+  function pushHttpUrl(list, candidate) {
+    if (typeof candidate === "string" && /^https?:\/\//i.test(candidate)) {
+      list.push(candidate);
+    }
   }
 
   function extractByKeys(value, keys) {
@@ -1085,6 +1165,78 @@
 
   function unique(items) {
     return Array.from(new Set(items.filter(Boolean)));
+  }
+
+  function setResultWaiting(message) {
+    const text = els.resultWaiting.querySelector("p");
+    if (text) {
+      text.textContent = message;
+    }
+    els.resultWaiting.hidden = false;
+  }
+
+  function revokeVideoObjectUrl() {
+    if (state.videoObjectUrl) {
+      URL.revokeObjectURL(state.videoObjectUrl);
+    }
+    state.videoObjectUrl = "";
+    state.videoSourceUrl = "";
+  }
+
+  async function ensurePlayableVideo(task, { surfaceError = false, force = false } = {}) {
+    if (!task?.videoUrl) {
+      return "";
+    }
+
+    if (!force && state.videoSourceUrl === task.videoUrl && state.videoObjectUrl) {
+      return state.videoObjectUrl;
+    }
+
+    try {
+      const response = await fetch(getVideoProxyUrl(task.videoUrl), {
+        method: "GET",
+        headers: buildHeaders(),
+      });
+
+      if (!response.ok) {
+        const data = await parseResponse(response);
+        throw new Error(formatHttpError(response, data));
+      }
+
+      const blob = await response.blob();
+      if (!blob.size) {
+        throw new Error("代理返回了空视频数据。");
+      }
+
+      revokeVideoObjectUrl();
+      state.videoObjectUrl = URL.createObjectURL(blob);
+      state.videoSourceUrl = task.videoUrl;
+
+      if (state.selectedUid === task.uid) {
+        els.resultVideo.src = state.videoObjectUrl;
+        els.resultVideo.hidden = false;
+        els.resultWaiting.hidden = true;
+        els.downloadVideoButton.disabled = false;
+      }
+
+      return state.videoObjectUrl;
+    } catch (error) {
+      if (state.selectedUid === task.uid) {
+        els.resultVideo.hidden = true;
+        setResultWaiting("视频地址已返回，但当前浏览器无法直接播放，建议先下载查看。");
+        els.downloadVideoButton.disabled = false;
+      }
+      if (surfaceError) {
+        flashMessage(els.requestError, withCorsHint(error.message));
+      }
+      return "";
+    }
+  }
+
+  function buildDownloadFilename(task) {
+    const base = (task.model || "video").replace(/[^\w.-]+/g, "-");
+    const id = (task.taskId || "task").replace(/[^\w.-]+/g, "-");
+    return `${base}-${id}.mp4`;
   }
 
   function createUid() {
